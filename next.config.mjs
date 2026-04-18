@@ -4,11 +4,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'unite-db.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'raw.githubusercontent.com', // 💡 PokeAPIの高画質画像を許可
+        hostname: 'd275t8dp8rxb42.cloudfront.net', // 💡 CloudFrontのドメインを許可
       },
     ],
   },
