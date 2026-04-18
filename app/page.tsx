@@ -55,7 +55,7 @@ export default function UniteDraftApp() {
   const recommendations = useMemo(() => {
     if (!db.length) return [];
 
-    const scored = db.map(pokemon => {
+    const scored = db.map((pokemon: any) => {
       const name = pokemon['名前(JP)'];
       let score = 50; 
       let reasons: string[] = [];
@@ -73,8 +73,8 @@ export default function UniteDraftApp() {
       }
 
       // 3. 敵チームへのカウンター評価
-      redTeam.forEach(enemy => {
-        const enemyMatrix = matrix.find(m => m.name === enemy);
+      redTeam.forEach((enemy: string) => {
+        const enemyMatrix = matrix.find((m: any) => m.name === enemy);
         if (enemyMatrix && enemyMatrix.counters) {
           const match = enemyMatrix.counters.find((c: any) => c.name === name);
           if (match) {
@@ -93,7 +93,7 @@ export default function UniteDraftApp() {
       let isRoleDuplicated = false;
       
       if (myRole) {
-        blueTeam.forEach(ally => {
+        blueTeam.forEach((ally: string) => {
           const allyData = getPokemonData(ally);
           if (allyData) {
             const allyRole = getRealRole(allyData['タグ']);
@@ -117,10 +117,10 @@ export default function UniteDraftApp() {
       return { ...pokemon, score, reasons };
     });
 
-    return scored.filter(p => p.score > -900).sort((a, b) => b.score - a.score).slice(0, 5);
+    return scored.filter((p: any) => p.score > -900).sort((a: any, b: any) => b.score - a.score).slice(0, 5);
   }, [db, matrix, blueTeam, redTeam, bans, myPool]);
 
-  // アクションハンドラ (💡 BANの制限を6に変更)
+  // アクションハンドラ
   const handleCharacterClick = (name: string) => {
     if (selectionMode === 'blue' && blueTeam.length < 5) setBlueTeam([...blueTeam, name]);
     if (selectionMode === 'red' && redTeam.length < 5) setRedTeam([...redTeam, name]);
@@ -128,14 +128,14 @@ export default function UniteDraftApp() {
   };
 
   const removeCharacter = (name: string, team: 'blue' | 'red' | 'ban') => {
-    if (team === 'blue') setBlueTeam(blueTeam.filter(n => n !== name));
-    if (team === 'red') setRedTeam(redTeam.filter(n => n !== name));
-    if (team === 'ban') setBans(bans.filter(n => n !== name));
+    if (team === 'blue') setBlueTeam(blueTeam.filter((n: string) => n !== name));
+    if (team === 'red') setRedTeam(redTeam.filter((n: string) => n !== name));
+    if (team === 'ban') setBans(bans.filter((n: string) => n !== name));
   };
 
   const togglePool = (name: string, e: React.MouseEvent) => {
     e.stopPropagation(); 
-    myPool.includes(name) ? setMyPool(myPool.filter(n => n !== name)) : setMyPool([...myPool, name]);
+    myPool.includes(name) ? setMyPool(myPool.filter((n: string) => n !== name)) : setMyPool([...myPool, name]);
   };
 
   const resetDraft = () => { setBlueTeam([]); setRedTeam([]); setBans([]); setSelectionMode('blue'); };
@@ -165,7 +165,7 @@ export default function UniteDraftApp() {
         <div className={`rounded-xl p-3 border-l-4 shadow-xl transition-colors min-h-[100px] bg-slate-950/80 backdrop-blur-sm ${selectionMode === 'blue' ? 'border-blue-400' : 'border-blue-800/50'}`}>
           <p className="text-xs font-bold text-blue-400 mb-2">BLUE TEAM (味方)</p>
           <div className="grid grid-cols-5 gap-1.5">
-            {blueTeam.map(p => {
+            {blueTeam.map((p: string) => {
               const data = getPokemonData(p);
               return (
                 <button key={p} onClick={() => removeCharacter(p, 'blue')} className="relative aspect-square bg-slate-900 rounded-lg border border-blue-500 overflow-hidden hover:border-red-500 transition group">
@@ -182,7 +182,7 @@ export default function UniteDraftApp() {
         <div className={`rounded-xl p-3 border-r-4 shadow-xl transition-colors text-right min-h-[100px] bg-slate-950/80 backdrop-blur-sm ${selectionMode === 'red' ? 'border-red-400' : 'border-red-800/50'}`}>
           <p className="text-xs font-bold text-red-400 mb-2">RED TEAM (敵)</p>
           <div className="grid grid-cols-5 gap-1.5 justify-items-end">
-            {redTeam.map(p => {
+            {redTeam.map((p: string) => {
               const data = getPokemonData(p);
               return (
                 <button key={p} onClick={() => removeCharacter(p, 'red')} className="relative aspect-square bg-slate-900 rounded-lg border border-red-500 overflow-hidden hover:border-red-500 transition group">
@@ -201,7 +201,7 @@ export default function UniteDraftApp() {
       <div className={`rounded-lg p-2 mb-6 flex items-center gap-2 min-h-[52px] transition-colors sticky top-[125px] z-20 backdrop-blur-sm ${selectionMode === 'ban' ? 'bg-slate-700/90 border border-slate-400' : 'bg-slate-800/50'}`}>
         <span className="text-xs font-bold text-slate-300 bg-slate-900 px-2 py-1 rounded">BAN</span>
         <div className="flex gap-1 flex-wrap">
-          {bans.map(p => {
+          {bans.map((p: string) => {
             const data = getPokemonData(p);
             return (
               <button key={p} onClick={() => removeCharacter(p, 'ban')} className="relative w-8 h-8 aspect-square bg-slate-900 rounded border border-slate-600 overflow-hidden group">
@@ -221,7 +221,7 @@ export default function UniteDraftApp() {
           <span>⚡</span> AI RECOMMENDED PICKS
         </h2>
         <div className="space-y-2">
-          {recommendations.length > 0 ? recommendations.map((rec, i) => {
+          {recommendations.length > 0 ? recommendations.map((rec: any, i: number) => {
             const iconUrl = rec['アイコンURL'];
             return (
               <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex gap-3 items-center ${i === 0 ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-slate-700'}`}>
@@ -236,7 +236,8 @@ export default function UniteDraftApp() {
                     <span className="text-[10px] text-slate-400">{rec['攻撃タイプ']}</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {rec.reasons.map((r, idx) => (
+                    {/* 💡 ここがエラーの原因だった箇所！型を明示して解決 */}
+                    {(rec.reasons || []).map((r: string, idx: number) => (
                       <span key={idx} className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded text-slate-300 border border-slate-700">{r}</span>
                     ))}
                   </div>
@@ -267,7 +268,7 @@ export default function UniteDraftApp() {
       <div className="bg-slate-800 rounded-b-2xl p-3 shadow-inner flex-1 overflow-y-auto min-h-[400px]">
         <h3 className="text-[10px] font-bold text-slate-500 mb-3 text-center">タップで陣営に追加 / 「★」をタップで持ちキャラ登録</h3>
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-          {db.map(p => {
+          {db.map((p: any) => {
             const name = p['名前(JP)'];
             const iconUrl = p['アイコンURL'];
             const isPicked = blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name);
