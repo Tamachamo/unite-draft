@@ -18,10 +18,10 @@ export default function UniteDraftApp() {
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
 
-  // 画面下部のキャラプールをクリックした際のアクションモード
+  // アクションモード
   const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
 
-  // 初回データ読み込み（自分のAPI経由）
+  // 初回データ読み込み
   useEffect(() => {
     async function loadData() {
       try {
@@ -84,8 +84,7 @@ export default function UniteDraftApp() {
         }
       });
 
-      // 4. 味方とのロール重複ペナルティ（💡バグ修正版）
-      // タグの中から "Melee" と "Ranged" 以外を抽出して真のロールを特定する
+      // 4. 味方とのロール重複ペナルティ
       const getRealRole = (tagStr: string) => {
         return (tagStr || "").split(',').map(t => t.trim()).find(t => t !== 'Melee' && t !== 'Ranged') || "";
       };
@@ -121,11 +120,11 @@ export default function UniteDraftApp() {
     return scored.filter(p => p.score > -900).sort((a, b) => b.score - a.score).slice(0, 5);
   }, [db, matrix, blueTeam, redTeam, bans, myPool]);
 
-  // アクションハンドラ
+  // アクションハンドラ (💡 BANの制限を6に変更)
   const handleCharacterClick = (name: string) => {
     if (selectionMode === 'blue' && blueTeam.length < 5) setBlueTeam([...blueTeam, name]);
     if (selectionMode === 'red' && redTeam.length < 5) setRedTeam([...redTeam, name]);
-    if (selectionMode === 'ban' && bans.length < 4) setBans([...bans, name]);
+    if (selectionMode === 'ban' && bans.length < 6) setBans([...bans, name]);
   };
 
   const removeCharacter = (name: string, team: 'blue' | 'red' | 'ban') => {
