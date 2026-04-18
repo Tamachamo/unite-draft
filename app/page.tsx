@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // ==========================================
 // 設定エリア
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbzEl_YNIS1LsWMFQer1Yfrv_bwGtrCx5_Kp_SYtCc8Yo0UsOgs_IYnw4uOAE-84qgqK/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyaP87SP53XFoEJaRrUaDIO34r__K9Jm5j-lyet84e-EoUOi7lysK8cghE3kQwign0U/exec';
 
 // ==========================================
 // メインコンポーネント
