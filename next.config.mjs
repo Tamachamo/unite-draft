@@ -11,3 +11,13 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    domains: ['unite-db.com'],
+  },
+}
+
+module.exports = nextConfig
