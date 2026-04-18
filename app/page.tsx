@@ -5,35 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // ==========================================
 // 設定エリア
 // ==========================================
-const SHEET_ID = '10Q_OLEbIRfyEO_Mp0KoVVi9DzyH2-Jqe7rk4EEgENIc';
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxFlLwj36Qs2uxx4mygs8Ds-SKOYSX8tx-hkkemuClOvtXI6a_XjClCd2frUm7rM5BF/exec';
-
-// ==========================================
-// データ取得ヘルパー
-// ==========================================
-async function fetchSheetData(sheetName: string) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-  
-  const text = await res.text();
-  const jsonString = text.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\);/);
-  
-  if (!jsonString) {
-    throw new Error("スプレッドシートのデータ形式が不正か、共有設定が「リンクを知っている全員」になっていません。");
-  }
-  
-  const data = JSON.parse(jsonString[1]);
-  const headers = data.table.cols.map((c: any) => c.label);
-  
-  return data.table.rows.map((row: any) => {
-    let obj: any = {};
-    row.c.forEach((cell: any, i: number) => {
-      obj[headers[i]] = cell ? cell.v : null;
-    });
-    return obj;
-  });
-}
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbzEl_YNIS1LsWMFQer1Yfrv_bwGtrCx5_Kp_SYtCc8Yo0UsOgs_IYnw4uOAE-84qgqK/exec';
 
 // ==========================================
 // メインコンポーネント
@@ -50,20 +22,23 @@ export default function UniteDraftApp() {
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
 
-  // 初回データ読み込み
+  // 💡 初回データ読み込み（GASから一括取得）
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [masterData, matrixResponse] = await Promise.all([
-          fetchSheetData('ポケモンDB_マスター'),
-          fetch(GAS_API_URL, { redirect: "follow" }).then(res => res.json())
-        ]);
-
-        if (masterData.length === 0) throw new Error("ポケモンDBが空です。");
+        const res = await fetch(GAS_API_URL, { redirect: "follow" });
         
-        setDb(masterData);
-        setMatrix(matrixResponse.error ? [] : matrixResponse);
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status} - APIサーバーとの通信に失敗しました。`);
+        
+        const data = await res.json();
+        
+        if (data.error) throw new Error(data.error);
+        if (!data.db || data.db.length === 0) throw new Error("ポケモンDBが空です。GAS側でマスター生成を実行してください。");
+
+        setDb(data.db);
+        setMatrix(data.matrix || []);
+        
       } catch (error: any) {
         console.error("データ読み込みエラー:", error);
         setErrorLog(error.message);
@@ -134,18 +109,18 @@ export default function UniteDraftApp() {
   const resetDraft = () => { setBlueTeam([]); setRedTeam([]); setBans([]); };
 
   // ローディング＆エラー画面
-  if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">データを同期中...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center">データを同期中...</div>;
   if (errorLog) return (
-    <div className="min-h-screen bg-slate-900 text-red-400 flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-screen text-red-400 flex flex-col items-center justify-center p-6 text-center">
       <h2 className="text-xl font-bold mb-4">🚨 データの取得に失敗しました</h2>
-      <p className="bg-slate-800 p-4 rounded text-sm">{errorLog}</p>
-      <p className="mt-4 text-slate-300 text-sm">スプレッドシートの共有設定が「リンクを知っている全員（閲覧者）」になっているか確認してください。</p>
+      <p className="bg-slate-800 p-4 rounded text-sm mb-4">{errorLog}</p>
+      <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-4 py-2 rounded">再読み込み</button>
     </div>
   );
 
   // メインUI
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans max-w-2xl mx-auto">
+    <div className="p-4 font-sans max-w-2xl mx-auto">
       <div className="flex justify-between items-end mb-6">
         <div>
           <h1 className="text-2xl font-black tracking-wider text-blue-400">DRAFT ANALYZER</h1>
@@ -222,7 +197,7 @@ export default function UniteDraftApp() {
             const isPicked = blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name);
             const isMyPool = myPool.includes(name);
             
-            if (isPicked || !name) return null; // 選ばれたキャラや空データは非表示
+            if (isPicked || !name) return null; 
             
             return (
               <div key={name} className="flex flex-col gap-1">
