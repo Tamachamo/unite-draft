@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 
 // ==========================================
 // メインコンポーネント
@@ -16,6 +17,9 @@ export default function UniteDraftApp() {
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
   const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
+  
+  // 💡 使い方モーダルの表示状態を管理
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -76,11 +80,10 @@ export default function UniteDraftApp() {
         }
       });
 
-      // 4. 味方とのロール重複ペナルティ（💡完全ホワイトリスト化）
+      // 4. 味方とのロール重複ペナルティ
       const getRealRole = (tagStr: string) => {
         if (!tagStr) return "";
         const tags = tagStr.split(',').map(t => t.trim());
-        // 公式の5つのロール以外は無視する（[object Object]やNoviceなどの誤作動を防ぐ）
         const validRoles = ['Attacker', 'Defender', 'Speedster', 'Supporter', 'All-Rounder', 'アタック', 'ディフェンス', 'スピード', 'サポート', 'バランス'];
         return tags.find(t => validRoles.includes(t)) || "";
       };
@@ -116,7 +119,6 @@ export default function UniteDraftApp() {
     return scored.filter((p: any) => p.score > -900).sort((a: any, b: any) => b.score - a.score).slice(0, 5);
   }, [db, matrix, blueTeam, redTeam, bans, myPool]);
 
-  // アクションハンドラ
   const handleCharacterClick = (name: string) => {
     if (selectionMode === 'blue' && blueTeam.length < 5) setBlueTeam([...blueTeam, name]);
     if (selectionMode === 'red' && redTeam.length < 5) setRedTeam([...redTeam, name]);
@@ -146,12 +148,74 @@ export default function UniteDraftApp() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans max-w-2xl mx-auto flex flex-col">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans max-w-2xl mx-auto flex flex-col relative">
+      
+      {/* 💡 使い方モーダル */}
+      {isHelpOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-600 shadow-2xl flex flex-col max-h-[85vh]">
+            <h2 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2 border-b border-slate-700 pb-3">
+              <span>❓</span> DRAFT ANALYZER 使い方
+            </h2>
+            
+            <div className="space-y-5 text-sm text-slate-300 overflow-y-auto pr-2 flex-1">
+              <div>
+                <h3 className="font-bold text-yellow-400 mb-1">🎯 1. 持ちキャラを登録しよう</h3>
+                <p className="text-xs leading-relaxed">
+                  画面下部のポケモン一覧で、左上の<span className="text-yellow-500 font-bold">「☆」</span>をタップして<span className="text-yellow-500 font-bold">「★」</span>にすると、あなたの得意キャラとして登録されます。<br/>
+                  AIが「得意キャラ」を優先してレコメンド（おすすめ）してくれるようになります。
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="font-bold text-white mb-1">⚔️ 2. ドラフトを進めよう</h3>
+                <p className="text-xs leading-relaxed">
+                  中央のタブで<span className="bg-blue-600 text-white px-1 rounded">🟦 味方</span> <span className="bg-slate-600 text-white px-1 rounded">🚫 BAN</span> <span className="bg-red-600 text-white px-1 rounded">🟥 敵</span> のモードを切り替え、下のポケモン一覧から該当するキャラをタップして追加していきます。
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-yellow-400 mb-1">⚡ 3. AIレコメンドを活用しよう</h3>
+                <p className="text-xs leading-relaxed">
+                  ドラフトが進むにつれ、中央にAIのおすすめキャラが表示されます。<br/>
+                  ・<span className="font-bold text-white">Tier環境（EX/S/A）</span><br/>
+                  ・<span className="font-bold text-white">敵へのカウンター相性</span><br/>
+                  ・<span className="font-bold text-white">味方とのロール被り回避</span><br/>
+                  をすべて自動計算して提案します。「PICK」ボタンを押せば味方に追加できます。
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-red-400 mb-1">🗑️ 4. 選択を間違えたら？</h3>
+                <p className="text-xs leading-relaxed">
+                  画面上部の味方・敵・BANエリアに追加されたポケモンのアイコンをタップすると、選択を取り消すことができます。
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setIsHelpOpen(false)} 
+              className="mt-5 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition shadow-lg"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ヘッダーエリア (💡 使い方ボタン追加) */}
       <div className="flex justify-between items-end mb-4">
         <div>
           <h1 className="text-2xl font-black tracking-wider text-blue-400">DRAFT ANALYZER</h1>
         </div>
-        <button onClick={resetDraft} className="bg-slate-700 px-3 py-1 rounded text-xs font-bold hover:bg-slate-600 transition">リセット</button>
+        <div className="flex gap-2">
+          <button onClick={() => setIsHelpOpen(true)} className="bg-slate-700 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-600 transition text-slate-200 border border-slate-600 shadow-sm flex items-center gap-1">
+            <span>❓</span> 使い方
+          </button>
+          <button onClick={resetDraft} className="bg-slate-800 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-700 transition text-red-400 border border-red-900/50 shadow-sm">
+            リセット
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4 sticky top-[10px] z-20">
