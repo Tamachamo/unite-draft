@@ -163,7 +163,7 @@ export default function UniteDraftApp() {
                 <h3 className="font-bold text-yellow-400 mb-1">🎯 1. 持ちキャラを登録しよう</h3>
                 <p className="text-xs leading-relaxed">
                   画面下部のポケモン一覧で、左上の<span className="text-yellow-500 font-bold">「☆」</span>をタップして<span className="text-yellow-500 font-bold">「★」</span>にすると、あなたの得意キャラとして登録されます。<br/>
-                  AIが「得意キャラ」を優先してレコメンド（おすすめ）してくれるようになります。
+                  「得意キャラ」を優先してレコメンド（おすすめ）してくれるようになります。
                 </p>
               </div>
               
@@ -175,7 +175,7 @@ export default function UniteDraftApp() {
               </div>
 
               <div>
-                <h3 className="font-bold text-yellow-400 mb-1">⚡ 3. AIレコメンドを活用しよう</h3>
+                <h3 className="font-bold text-yellow-400 mb-1">⚡ 3. レコメンドを活用しよう</h3>
                 <p className="text-xs leading-relaxed">
                   ドラフトが進むにつれ、中央にAIのおすすめキャラが表示されます。<br/>
                   ・<span className="font-bold text-white">Tier環境（EX/S/A）</span><br/>
