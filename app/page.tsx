@@ -1,12 +1,6 @@
 'use client';
 
-
 import React, { useState, useEffect, useMemo } from 'react';
-
-// ==========================================
-// 設定エリア
-// ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyaP87SP53XFoEJaRrUaDIO34r__K9Jm5j-lyet84e-EoUOi7lysK8cghE3kQwign0U/exec';
 
 // ==========================================
 // メインコンポーネント
@@ -23,17 +17,21 @@ export default function UniteDraftApp() {
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
 
-  // 💡 初回データ読み込み（GASから一括取得）
+  // 画面下部のキャラプールをクリックした際のアクションモード
+  const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
+
+  // 初回データ読み込み（自分のAPI経由）
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const res = await fetch(GAS_API_URL, { redirect: "follow" });
+        setErrorLog(null);
         
-        if (!res.ok) throw new Error(`HTTP Error: ${res.status} - APIサーバーとの通信に失敗しました。`);
-        
+        // Next.jsのAPIルートを叩く
+        const res = await fetch('/api/gas');
         const data = await res.json();
         
+        if (!res.ok) throw new Error(data.error || "サーバーエラーが発生しました");
         if (data.error) throw new Error(data.error);
         if (!data.db || data.db.length === 0) throw new Error("ポケモンDBが空です。GAS側でマスター生成を実行してください。");
 
@@ -59,13 +57,20 @@ export default function UniteDraftApp() {
       let score = 50; 
       let reasons: string[] = [];
 
-      // 1. 持ちキャラボーナス
+      // 1. 環境メタ（Unite-DBのティア）の評価
+      const tier = pokemon['ティア'] || "";
+      if (tier.includes("EX")) { score += 40; reasons.push('👑 EXティア'); }
+      else if (tier.includes("S")) { score += 30; reasons.push('📈 Sティア'); }
+      else if (tier.includes("A")) { score += 20; reasons.push('✨ Aティア'); }
+      else if (tier.includes("C") || tier.includes("D")) { score -= 15; reasons.push('📉 環境外'); }
+
+      // 2. 持ちキャラボーナス
       if (myPool.includes(name)) {
-        score += 100;
+        score += 80;
         reasons.push('⭐ 持ちキャラ');
       }
 
-      // 2. 敵チームへのカウンター評価 (GASから取得したJSONデータを使用)
+      // 3. 敵チームへのカウンター評価
       redTeam.forEach(enemy => {
         const enemyMatrix = matrix.find(m => m.name === enemy);
         if (enemyMatrix && enemyMatrix.counters) {
@@ -77,7 +82,7 @@ export default function UniteDraftApp() {
         }
       });
 
-      // 3. 味方とのロール重複ペナルティ
+      // 4. 味方とのロール重複ペナルティ
       const myRole = (pokemon['タグ'] || "").split(',')[0];
       let isRoleDuplicated = false;
       blueTeam.forEach(ally => {
@@ -91,7 +96,7 @@ export default function UniteDraftApp() {
         reasons.push('⚠️ ロール重複');
       }
 
-      // 4. すでにピック・BANされたキャラは除外
+      // 5. すでにピック・BANされたキャラは除外
       if (blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name)) {
         score = -999; 
       }
@@ -103,63 +108,86 @@ export default function UniteDraftApp() {
   }, [db, matrix, blueTeam, redTeam, bans, myPool]);
 
   // アクションハンドラ
-  const handlePickBlue = (name: string) => blueTeam.length < 5 && setBlueTeam([...blueTeam, name]);
-  const handlePickRed = (name: string) => redTeam.length < 5 && setRedTeam([...redTeam, name]);
-  const handleBan = (name: string) => bans.length < 4 && setBans([...bans, name]);
-  const togglePool = (name: string) => myPool.includes(name) ? setMyPool(myPool.filter(n => n !== name)) : setMyPool([...myPool, name]);
-  const resetDraft = () => { setBlueTeam([]); setRedTeam([]); setBans([]); };
+  const handleCharacterClick = (name: string) => {
+    if (selectionMode === 'blue' && blueTeam.length < 5) setBlueTeam([...blueTeam, name]);
+    if (selectionMode === 'red' && redTeam.length < 5) setRedTeam([...redTeam, name]);
+    if (selectionMode === 'ban' && bans.length < 4) setBans([...bans, name]);
+  };
+
+  const removeCharacter = (name: string, team: 'blue' | 'red' | 'ban') => {
+    if (team === 'blue') setBlueTeam(blueTeam.filter(n => n !== name));
+    if (team === 'red') setRedTeam(redTeam.filter(n => n !== name));
+    if (team === 'ban') setBans(bans.filter(n => n !== name));
+  };
+
+  const togglePool = (name: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // 親要素のクリックイベントを発火させない
+    myPool.includes(name) ? setMyPool(myPool.filter(n => n !== name)) : setMyPool([...myPool, name]);
+  };
+
+  const resetDraft = () => { setBlueTeam([]); setRedTeam([]); setBans([]); setSelectionMode('blue'); };
 
   // ローディング＆エラー画面
-  if (loading) return <div className="min-h-screen flex items-center justify-center">データを同期中...</div>;
+  if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">データを同期中...</div>;
   if (errorLog) return (
-    <div className="min-h-screen text-red-400 flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-screen bg-slate-900 text-red-400 flex flex-col items-center justify-center p-6 text-center">
       <h2 className="text-xl font-bold mb-4">🚨 データの取得に失敗しました</h2>
       <p className="bg-slate-800 p-4 rounded text-sm mb-4">{errorLog}</p>
       <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-4 py-2 rounded">再読み込み</button>
     </div>
   );
 
-  // メインUI
   return (
-    <div className="p-4 font-sans max-w-2xl mx-auto">
-      <div className="flex justify-between items-end mb-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans max-w-2xl mx-auto flex flex-col">
+      {/* ヘッダーエリア */}
+      <div className="flex justify-between items-end mb-4">
         <div>
           <h1 className="text-2xl font-black tracking-wider text-blue-400">DRAFT ANALYZER</h1>
-          <p className="text-xs text-slate-400 mt-1">スプレッドシート完全同期型・高速計算AI</p>
+          <p className="text-[10px] text-slate-400 mt-1">Tier環境 & カウンター相性 自動計算ツール</p>
         </div>
         <button onClick={resetDraft} className="bg-slate-700 px-3 py-1 rounded text-xs font-bold hover:bg-slate-600 transition">リセット</button>
       </div>
 
-      {/* ピック状況エリア */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-slate-800 rounded-xl p-3 border-l-4 border-blue-500 shadow-lg min-h-[80px]">
+      {/* ピック状況エリア（タップでキャラ削除可能） */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className={`rounded-xl p-3 border-l-4 shadow-lg transition-colors ${selectionMode === 'blue' ? 'bg-blue-900/30 border-blue-400' : 'bg-slate-800 border-blue-800'}`}>
           <p className="text-xs font-bold text-blue-400 mb-2">BLUE TEAM (味方)</p>
-          <div className="flex flex-wrap gap-1">
-            {blueTeam.map(p => <span key={p} className="bg-blue-900/50 text-blue-100 text-[10px] px-2 py-1 rounded border border-blue-700/50">{p}</span>)}
-            {blueTeam.length === 0 && <span className="text-xs text-slate-500">Pick waiting...</span>}
+          <div className="flex flex-wrap gap-1 min-h-[28px]">
+            {blueTeam.map(p => (
+              <button key={p} onClick={() => removeCharacter(p, 'blue')} className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded border border-blue-400 hover:bg-red-500 hover:line-through transition">
+                {p}
+              </button>
+            ))}
           </div>
         </div>
         
-        <div className="bg-slate-800 rounded-xl p-3 border-r-4 border-red-500 shadow-lg min-h-[80px]">
-          <p className="text-xs font-bold text-red-400 mb-2 text-right">RED TEAM (敵)</p>
-          <div className="flex flex-wrap gap-1 justify-end">
-            {redTeam.map(p => <span key={p} className="bg-red-900/50 text-red-100 text-[10px] px-2 py-1 rounded border border-red-700/50">{p}</span>)}
-            {redTeam.length === 0 && <span className="text-xs text-slate-500">Pick waiting...</span>}
+        <div className={`rounded-xl p-3 border-r-4 shadow-lg transition-colors text-right ${selectionMode === 'red' ? 'bg-red-900/30 border-red-400' : 'bg-slate-800 border-red-800'}`}>
+          <p className="text-xs font-bold text-red-400 mb-2">RED TEAM (敵)</p>
+          <div className="flex flex-wrap gap-1 justify-end min-h-[28px]">
+            {redTeam.map(p => (
+              <button key={p} onClick={() => removeCharacter(p, 'red')} className="bg-red-600 text-white text-[10px] px-2 py-1 rounded border border-red-400 hover:bg-red-500 hover:line-through transition">
+                {p}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {/* BANエリア */}
-      <div className="bg-slate-800/50 rounded-lg p-2 mb-6 flex items-center gap-2 min-h-[40px]">
-        <span className="text-xs font-bold text-slate-400 bg-slate-900 px-2 py-1 rounded">BAN</span>
+      <div className={`rounded-lg p-2 mb-6 flex items-center gap-2 min-h-[44px] transition-colors ${selectionMode === 'ban' ? 'bg-slate-700 border border-slate-400' : 'bg-slate-800/50'}`}>
+        <span className="text-xs font-bold text-slate-300 bg-slate-900 px-2 py-1 rounded">BAN</span>
         <div className="flex gap-1 flex-wrap">
-          {bans.map(p => <span key={p} className="text-[10px] line-through text-slate-500">{p}</span>)}
+          {bans.map(p => (
+            <button key={p} onClick={() => removeCharacter(p, 'ban')} className="text-[10px] line-through text-slate-400 hover:text-red-400 hover:no-underline transition">
+              {p}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* AIレコメンドエリア */}
-      <div className="mb-8">
-        <h2 className="text-sm font-bold text-yellow-400 mb-3 flex items-center gap-2">
+      <div className="mb-6 flex-shrink-0">
+        <h2 className="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
           <span>⚡</span> AI RECOMMENDED PICKS
         </h2>
         <div className="space-y-2">
@@ -167,31 +195,54 @@ export default function UniteDraftApp() {
             <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex justify-between items-center ${i === 0 ? 'border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'border-slate-700'}`}>
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-bold text-lg">{rec['名前(JP)']}</span>
+                  <span className="font-bold text-base">{rec['名前(JP)']}</span>
                   <span className="text-[10px] text-slate-400">{rec['攻撃タイプ']}</span>
                 </div>
-                <div className="flex flex-wrap gap-1 mt-1.5">
+                <div className="flex flex-wrap gap-1 mt-1">
                   {rec.reasons.map((r, idx) => (
-                    <span key={idx} className="text-[9px] bg-slate-900 px-1.5 py-0.5 rounded text-slate-300">{r}</span>
+                    <span key={idx} className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded text-slate-300 border border-slate-700">{r}</span>
                   ))}
                 </div>
               </div>
               <button 
-                onClick={() => handlePickBlue(rec['名前(JP)'])} 
-                className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold text-xs shadow-lg transition"
+                onClick={() => setBlueTeam([...blueTeam, rec['名前(JP)']])} 
+                disabled={blueTeam.length >= 5}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 px-3 py-1.5 rounded font-bold text-xs shadow-lg transition"
               >
-                PICK
+                味方ピック
               </button>
             </div>
           )) : (
-            <div className="text-slate-500 text-sm py-4 text-center bg-slate-800 rounded-lg border border-slate-700">ピック可能なポケモンがいません</div>
+            <div className="text-slate-500 text-sm py-4 text-center bg-slate-800 rounded-lg border border-slate-700">オススメ対象がいません</div>
           )}
         </div>
       </div>
 
+      {/* モード切り替えタブ */}
+      <div className="flex gap-1 mb-2 bg-slate-900 p-1 rounded-lg sticky top-0 z-10 border border-slate-700 shadow-xl">
+        <button 
+          onClick={() => setSelectionMode('blue')} 
+          className={`flex-1 py-2 text-xs font-bold rounded transition ${selectionMode === 'blue' ? 'bg-blue-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+        >
+          🟦 味方ピック
+        </button>
+        <button 
+          onClick={() => setSelectionMode('ban')} 
+          className={`flex-1 py-2 text-xs font-bold rounded transition ${selectionMode === 'ban' ? 'bg-slate-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+        >
+          🚫 BANピック
+        </button>
+        <button 
+          onClick={() => setSelectionMode('red')} 
+          className={`flex-1 py-2 text-xs font-bold rounded transition ${selectionMode === 'red' ? 'bg-red-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+        >
+          🟥 敵ピック
+        </button>
+      </div>
+
       {/* キャラクタープール（選択エリア） */}
-      <div className="bg-slate-800 rounded-t-2xl p-4 shadow-[0_-10px_20px_rgba(0,0,0,0.3)] h-80 overflow-y-auto">
-        <h3 className="text-xs font-bold text-slate-400 mb-3 text-center">タップして陣営に追加 / 上部をタップで持ちキャラ登録</h3>
+      <div className="bg-slate-800 rounded-2xl p-3 shadow-inner flex-1 overflow-y-auto min-h-[300px]">
+        <h3 className="text-[10px] font-bold text-slate-400 mb-3 text-center">キャラをタップで追加 / 「★」をタップで得意キャラ登録</h3>
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {db.map(p => {
             const name = p['名前(JP)'];
@@ -201,20 +252,27 @@ export default function UniteDraftApp() {
             if (isPicked || !name) return null; 
             
             return (
-              <div key={name} className="flex flex-col gap-1">
-                <button 
-                  onClick={() => togglePool(name)}
-                  className={`text-[9px] rounded-t py-1 border-b border-slate-800 transition ${isMyPool ? 'bg-green-600/80 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+              <button 
+                key={name}
+                onClick={() => handleCharacterClick(name)}
+                className={`relative flex flex-col items-center justify-center h-16 rounded-lg border transition transform hover:scale-105 active:scale-95 ${
+                  selectionMode === 'blue' ? 'border-blue-900/50 hover:border-blue-400 hover:bg-blue-900/20' : 
+                  selectionMode === 'red' ? 'border-red-900/50 hover:border-red-400 hover:bg-red-900/20' : 
+                  'border-slate-700 hover:border-slate-400 hover:bg-slate-700/50'
+                } bg-slate-900/50 overflow-hidden shadow-sm`}
+              >
+                {/* 持ちキャラ切り替えボタン */}
+                <div 
+                  onClick={(e) => togglePool(name, e)}
+                  className={`absolute top-0 left-0 w-full text-center text-[8px] py-[2px] transition ${isMyPool ? 'bg-green-600/90 text-white' : 'bg-slate-800 text-slate-500 hover:bg-slate-600 hover:text-white'}`}
                 >
-                  {isMyPool ? '★得意' : '練習中'}
-                </button>
-                <div className="flex gap-[1px]">
-                  <button onClick={() => handlePickBlue(name)} className="flex-1 bg-blue-900/60 hover:bg-blue-500 p-2 text-[10px] font-bold rounded-bl transition">青</button>
-                  <button onClick={() => handleBan(name)} className="flex-1 bg-slate-700 hover:bg-slate-500 p-2 text-[10px] font-bold transition">B</button>
-                  <button onClick={() => handlePickRed(name)} className="flex-1 bg-red-900/60 hover:bg-red-500 p-2 text-[10px] font-bold rounded-br transition">赤</button>
+                  {isMyPool ? '★得意' : '登録'}
                 </div>
-                <div className="text-center text-[10px] mt-1 truncate text-slate-300">{name}</div>
-              </div>
+                
+                <span className="text-[11px] font-bold text-center mt-3 leading-tight px-1">
+                  {name}
+                </span>
+              </button>
             );
           })}
         </div>
