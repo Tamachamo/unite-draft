@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 
 // ==========================================
 // メインコンポーネント
@@ -11,16 +12,12 @@ export default function UniteDraftApp() {
   const [loading, setLoading] = useState(true);
   const [errorLog, setErrorLog] = useState<string | null>(null);
 
-  // ドラフトのステータス
   const [blueTeam, setBlueTeam] = useState<string[]>([]);
   const [redTeam, setRedTeam] = useState<string[]>([]);
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
-
-  // アクションモード
   const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
 
-  // 初回データ読み込み
   useEffect(() => {
     async function loadData() {
       try {
@@ -36,7 +33,6 @@ export default function UniteDraftApp() {
 
         setDb(data.db);
         setMatrix(data.matrix || []);
-        
       } catch (error: any) {
         console.error("データ読み込みエラー:", error);
         setErrorLog(error.message);
@@ -47,10 +43,8 @@ export default function UniteDraftApp() {
     loadData();
   }, []);
 
-  // ヘルパー関数
   const getPokemonData = (name: string) => db.find(p => p['名前(JP)'] === name);
 
-  // リアルタイムAIスコアリング計算
   const recommendations = useMemo(() => {
     if (!db.length) return [];
 
@@ -83,18 +77,18 @@ export default function UniteDraftApp() {
         }
       });
 
-      // 4. 味方とのロール重複ペナルティ（💡バグ完全修正版）
+      // 4. 味方とのロール重複ペナルティ（💡ホワイトリストで完璧に修正）
       const getRealRole = (tagStr: string) => {
         if (!tagStr) return "";
         const tags = tagStr.split(',').map(t => t.trim());
-        // 物理/特殊/近接/遠隔 を除外して純粋なロールを取得
-        return tags.find(t => !['Melee', 'Ranged', 'Physical', 'Special'].includes(t)) || "";
+        // 「Novice」などを無視し、純粋な5つのロールのみを抽出
+        const validRoles = ['Attacker', 'Defender', 'Speedster', 'Supporter', 'All-Rounder'];
+        return tags.find(t => validRoles.includes(t)) || "";
       };
       
       const myRole = getRealRole(pokemon['タグ']);
       let isRoleDuplicated = false;
       
-      // 空文字のロール同士が一致しないように厳格にチェック
       if (myRole !== "") {
         blueTeam.forEach((ally: string) => {
           const allyData = getPokemonData(ally);
@@ -112,7 +106,7 @@ export default function UniteDraftApp() {
         reasons.push('⚠️ ロール重複');
       }
 
-      // 5. すでにピック・BANされたキャラは除外
+      // 5. ピック・BAN済みの除外
       if (blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name)) {
         score = -999; 
       }
@@ -143,7 +137,6 @@ export default function UniteDraftApp() {
 
   const resetDraft = () => { setBlueTeam([]); setRedTeam([]); setBans([]); setSelectionMode('blue'); };
 
-  // ローディング＆エラー画面
   if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">データを同期中...</div>;
   if (errorLog) return (
     <div className="min-h-screen bg-slate-900 text-red-400 flex flex-col items-center justify-center p-6 text-center">
@@ -162,7 +155,6 @@ export default function UniteDraftApp() {
         <button onClick={resetDraft} className="bg-slate-700 px-3 py-1 rounded text-xs font-bold hover:bg-slate-600 transition">リセット</button>
       </div>
 
-      {/* ピック状況エリア (💡標準の<img>タグに変更) */}
       <div className="grid grid-cols-2 gap-3 mb-4 sticky top-[10px] z-20">
         <div className={`rounded-xl p-3 border-l-4 shadow-xl transition-colors min-h-[100px] bg-slate-950/80 backdrop-blur-sm ${selectionMode === 'blue' ? 'border-blue-400' : 'border-blue-800/50'}`}>
           <p className="text-xs font-bold text-blue-400 mb-2">BLUE TEAM (味方)</p>
@@ -172,8 +164,8 @@ export default function UniteDraftApp() {
               return (
                 <button key={p} onClick={() => removeCharacter(p, 'blue')} className="relative aspect-square bg-slate-900 rounded-lg border border-blue-500 overflow-hidden hover:border-red-500 transition group flex items-center justify-center">
                   {data?.['アイコンURL'] ? (
-                    <img src={data['アイコンURL']} alt={p} className="w-full h-full object-cover group-hover:opacity-30" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                  ) : <span className="text-[8px] text-slate-500">{p}</span>}
+                    <Image src={data['アイコンURL']} alt={p} fill sizes="50vw" className="object-cover group-hover:opacity-30" unoptimized />
+                  ) : <span className="text-[8px] text-slate-500 font-bold">{p}</span>}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 text-red-400 text-[8px] font-black">X</div>
                 </button>
               )
@@ -189,8 +181,8 @@ export default function UniteDraftApp() {
               return (
                 <button key={p} onClick={() => removeCharacter(p, 'red')} className="relative aspect-square bg-slate-900 rounded-lg border border-red-500 overflow-hidden hover:border-red-500 transition group flex items-center justify-center">
                   {data?.['アイコンURL'] ? (
-                    <img src={data['アイコンURL']} alt={p} className="w-full h-full object-cover group-hover:opacity-30" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                  ) : <span className="text-[8px] text-slate-500">{p}</span>}
+                    <Image src={data['アイコンURL']} alt={p} fill sizes="50vw" className="object-cover group-hover:opacity-30" unoptimized />
+                  ) : <span className="text-[8px] text-slate-500 font-bold">{p}</span>}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 text-red-400 text-[8px] font-black">X</div>
                 </button>
               )
@@ -199,7 +191,6 @@ export default function UniteDraftApp() {
         </div>
       </div>
 
-      {/* BANエリア */}
       <div className={`rounded-lg p-2 mb-6 flex items-center gap-2 min-h-[52px] transition-colors sticky top-[125px] z-20 backdrop-blur-sm ${selectionMode === 'ban' ? 'bg-slate-700/90 border border-slate-400' : 'bg-slate-800/50'}`}>
         <span className="text-xs font-bold text-slate-300 bg-slate-900 px-2 py-1 rounded">BAN</span>
         <div className="flex gap-1 flex-wrap">
@@ -208,7 +199,7 @@ export default function UniteDraftApp() {
             return (
               <button key={p} onClick={() => removeCharacter(p, 'ban')} className="relative w-8 h-8 aspect-square bg-slate-900 rounded border border-slate-600 overflow-hidden group flex items-center justify-center">
                 {data?.['アイコンURL'] ? (
-                  <img src={data['アイコンURL']} alt={p} className="w-full h-full object-cover opacity-50 grayscale group-hover:opacity-30" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                  <Image src={data['アイコンURL']} alt={p} fill sizes="50vw" className="object-cover opacity-50 grayscale group-hover:opacity-30" unoptimized />
                 ) : <span className="text-[8px] text-slate-500 line-through">{p}</span>}
                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 text-red-400 text-[8px] font-black">X</div>
               </button>
@@ -217,7 +208,6 @@ export default function UniteDraftApp() {
         </div>
       </div>
 
-      {/* AIレコメンドエリア */}
       <div className="mb-6 flex-shrink-0 relative z-10">
         <h2 className="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
           <span>⚡</span> AI RECOMMENDED PICKS
@@ -227,9 +217,13 @@ export default function UniteDraftApp() {
             const iconUrl = rec['アイコンURL'];
             return (
               <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex gap-3 items-center ${i === 0 ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-slate-700'}`}>
-                {iconUrl && (
+                {iconUrl ? (
                   <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-600 flex-shrink-0 bg-slate-900">
-                    <img src={iconUrl} alt={rec['名前(JP)']} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                    <Image src={iconUrl} alt={rec['名前(JP)']} fill sizes="100vw" className="object-cover" unoptimized />
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded-lg border border-slate-600 flex-shrink-0 bg-slate-900 flex items-center justify-center">
+                    <span className="text-[10px] text-slate-500">No Img</span>
                   </div>
                 )}
                 <div className="flex-1">
@@ -258,14 +252,12 @@ export default function UniteDraftApp() {
         </div>
       </div>
 
-      {/* モード切り替えタブ */}
       <div className="flex gap-1 mb-2 bg-slate-950 p-1.5 rounded-t-xl sticky top-[185px] z-10 border border-slate-700 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
         <button onClick={() => setSelectionMode('blue')} className={`flex-1 py-2.5 text-xs font-bold rounded transition ${selectionMode === 'blue' ? 'bg-blue-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400'}`}>🟦 味方ピック</button>
         <button onClick={() => setSelectionMode('ban')} className={`flex-1 py-2.5 text-xs font-bold rounded transition ${selectionMode === 'ban' ? 'bg-slate-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400'}`}>🚫 BANピック</button>
         <button onClick={() => setSelectionMode('red')} className={`flex-1 py-2.5 text-xs font-bold rounded transition ${selectionMode === 'red' ? 'bg-red-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400'}`}>🟥 敵ピック</button>
       </div>
 
-      {/* キャラクタープール */}
       <div className="bg-slate-800 rounded-b-2xl p-3 shadow-inner flex-1 overflow-y-auto min-h-[400px]">
         <h3 className="text-[10px] font-bold text-slate-500 mb-3 text-center">タップで陣営に追加 / 「★」をタップで持ちキャラ登録</h3>
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
@@ -287,8 +279,10 @@ export default function UniteDraftApp() {
                   'border-slate-700 hover:border-slate-400'
                 }`}
               >
-                {iconUrl && (
-                  <img src={iconUrl} alt={name} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                {iconUrl ? (
+                  <Image src={iconUrl} alt={name} fill sizes="50vw" className="object-cover opacity-60 group-hover:opacity-100 transition" unoptimized />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center opacity-60"><span className="text-[10px] text-slate-500">No Img</span></div>
                 )}
 
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent p-1.5 pt-4">
