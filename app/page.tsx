@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
 
 // ==========================================
 // メインコンポーネント
@@ -77,12 +76,12 @@ export default function UniteDraftApp() {
         }
       });
 
-      // 4. 味方とのロール重複ペナルティ（💡ホワイトリストで完璧に修正）
+      // 4. 味方とのロール重複ペナルティ（💡完全ホワイトリスト化）
       const getRealRole = (tagStr: string) => {
         if (!tagStr) return "";
         const tags = tagStr.split(',').map(t => t.trim());
-        // 「Novice」などを無視し、純粋な5つのロールのみを抽出
-        const validRoles = ['Attacker', 'Defender', 'Speedster', 'Supporter', 'All-Rounder'];
+        // 公式の5つのロール以外は無視する（[object Object]やNoviceなどの誤作動を防ぐ）
+        const validRoles = ['Attacker', 'Defender', 'Speedster', 'Supporter', 'All-Rounder', 'アタック', 'ディフェンス', 'スピード', 'サポート', 'バランス'];
         return tags.find(t => validRoles.includes(t)) || "";
       };
       
@@ -164,7 +163,7 @@ export default function UniteDraftApp() {
               return (
                 <button key={p} onClick={() => removeCharacter(p, 'blue')} className="relative aspect-square bg-slate-900 rounded-lg border border-blue-500 overflow-hidden hover:border-red-500 transition group flex items-center justify-center">
                   {data?.['アイコンURL'] ? (
-                    <Image src={data['アイコンURL']} alt={p} fill sizes="50vw" className="object-cover group-hover:opacity-30" unoptimized />
+                    <img src={data['アイコンURL']} alt={p} className="w-full h-full object-cover group-hover:opacity-30" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                   ) : <span className="text-[8px] text-slate-500 font-bold">{p}</span>}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 text-red-400 text-[8px] font-black">X</div>
                 </button>
@@ -181,7 +180,7 @@ export default function UniteDraftApp() {
               return (
                 <button key={p} onClick={() => removeCharacter(p, 'red')} className="relative aspect-square bg-slate-900 rounded-lg border border-red-500 overflow-hidden hover:border-red-500 transition group flex items-center justify-center">
                   {data?.['アイコンURL'] ? (
-                    <Image src={data['アイコンURL']} alt={p} fill sizes="50vw" className="object-cover group-hover:opacity-30" unoptimized />
+                    <img src={data['アイコンURL']} alt={p} className="w-full h-full object-cover group-hover:opacity-30" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                   ) : <span className="text-[8px] text-slate-500 font-bold">{p}</span>}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 text-red-400 text-[8px] font-black">X</div>
                 </button>
@@ -199,7 +198,7 @@ export default function UniteDraftApp() {
             return (
               <button key={p} onClick={() => removeCharacter(p, 'ban')} className="relative w-8 h-8 aspect-square bg-slate-900 rounded border border-slate-600 overflow-hidden group flex items-center justify-center">
                 {data?.['アイコンURL'] ? (
-                  <Image src={data['アイコンURL']} alt={p} fill sizes="50vw" className="object-cover opacity-50 grayscale group-hover:opacity-30" unoptimized />
+                  <img src={data['アイコンURL']} alt={p} className="w-full h-full object-cover opacity-50 grayscale group-hover:opacity-30" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                 ) : <span className="text-[8px] text-slate-500 line-through">{p}</span>}
                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/50 text-red-400 text-[8px] font-black">X</div>
               </button>
@@ -219,7 +218,7 @@ export default function UniteDraftApp() {
               <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex gap-3 items-center ${i === 0 ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-slate-700'}`}>
                 {iconUrl ? (
                   <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-600 flex-shrink-0 bg-slate-900">
-                    <Image src={iconUrl} alt={rec['名前(JP)']} fill sizes="100vw" className="object-cover" unoptimized />
+                    <img src={iconUrl} alt={rec['名前(JP)']} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                   </div>
                 ) : (
                   <div className="w-14 h-14 rounded-lg border border-slate-600 flex-shrink-0 bg-slate-900 flex items-center justify-center">
@@ -280,9 +279,9 @@ export default function UniteDraftApp() {
                 }`}
               >
                 {iconUrl ? (
-                  <Image src={iconUrl} alt={name} fill sizes="50vw" className="object-cover opacity-60 group-hover:opacity-100 transition" unoptimized />
+                  <img src={iconUrl} alt={name} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-60"><span className="text-[10px] text-slate-500">No Img</span></div>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-60"><span className="text-[10px] text-slate-500 font-bold">{name}</span></div>
                 )}
 
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent p-1.5 pt-4">
