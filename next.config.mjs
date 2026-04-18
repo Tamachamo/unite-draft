@@ -5,8 +5,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'unite-db.com',
-        port: '',
-        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com', // 💡 PokeAPIの高画質画像を許可
       },
     ],
   },
