@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 // ==========================================
-// 設定：スプレッドシートID
+// 設定：スプレッドシートID & GAS API URL
 // ==========================================
 const SHEET_ID = '10Q_OLEbIRfyEO_Mp0KoVVi9DzyH2-Jqe7rk4EEgENIc';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxFlLwj36Qs2uxx4mygs8Ds-SKOYSX8tx-hkkemuClOvtXI6a_XjClCd2frUm7rM5BF/exec';
 
 // ==========================================
-// データ取得ヘルパー（Google Sheets -> JSON変換）
+// データ取得ヘルパー（Google Sheets -> JSON変換）※マスターDB用
 // ==========================================
 async function fetchSheetData(sheetName: string) {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
@@ -42,15 +43,22 @@ export default function UniteDraftApp() {
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
 
+  // 💡 修正箇所：GAS APIからのデータ取得処理を統合
   useEffect(() => {
     async function loadData() {
       try {
-        const [masterData, matrixData] = await Promise.all([
+        // マスターDBはスプレッドシートから、相性マトリクスはGAS APIから並行取得
+        const [masterData, matrixResponse] = await Promise.all([
           fetchSheetData('ポケモンDB_マスター'),
-          fetchSheetData('相性マトリクス_生成版')
+          fetch(GAS_API_URL, { redirect: "follow" }) // GAS APIを叩く
         ]);
+
+        if (!matrixResponse.ok) throw new Error("APIからの相性データ取得に失敗しました");
+        const matrixData = await matrixResponse.json();
+
         setDb(masterData);
-        setMatrix(matrixData);
+        setMatrix(matrixData.error ? [] : matrixData); // エラーが含まれていれば空配列にする
+
       } catch (error) {
         console.error("データ読み込みエラー:", error);
       } finally {
@@ -60,6 +68,7 @@ export default function UniteDraftApp() {
     loadData();
   }, []);
 
+  // 💡 修正箇所：GAS APIのデータ構造（最初からJSONオブジェクト）に合わせたスコア計算
   const recommendations = useMemo(() => {
     if (!db.length || !matrix.length) return [];
 
@@ -68,31 +77,34 @@ export default function UniteDraftApp() {
       let score = 50; 
       let reasons: string[] = [];
 
+      // 得意キャラボーナス
       if (myPool.includes(name)) {
         score += 100;
         reasons.push('⭐ 習熟度高(持ちキャラ)');
       }
 
+      // 敵チームに対するカウンター評価（APIからのデータ構造に合わせて変更）
       redTeam.forEach(enemy => {
-        const enemyMatrix = matrix.find(m => m['対象ポケモン'] === enemy);
-        if (enemyMatrix && enemyMatrix['システム用JSONデータ']) {
-          try {
-            const counterData = JSON.parse(enemyMatrix['システム用JSONデータ']);
-            const match = counterData.counters.find((c: any) => c.name === name);
-            if (match) {
-              if (match.rank === 'S') {
-                score += 40;
-                reasons.push(`🔥 ${enemy}のSランクカウンター`);
-              }
-              if (match.rank === 'A') {
-                score += 20;
-                reasons.push(`👍 ${enemy}に有利`);
-              }
+        // APIから取得したデータはキーが 'name' になっている
+        const enemyMatrix = matrix.find(m => m.name === enemy);
+        
+        // すでにJSONパース済みなので、直接 .counters にアクセス可能
+        if (enemyMatrix && enemyMatrix.counters) {
+          const match = enemyMatrix.counters.find((c: any) => c.name === name);
+          if (match) {
+            if (match.rank === 'S') {
+              score += 40;
+              reasons.push(`🔥 ${enemy}のSランクカウンター`);
             }
-          } catch (e) {}
+            if (match.rank === 'A') {
+              score += 20;
+              reasons.push(`👍 ${enemy}に有利`);
+            }
+          }
         }
       });
 
+      // 味方チームとのロール重複ペナルティ
       const myTags = pokemon['タグ'] || "";
       let isRoleDuplicated = false;
       blueTeam.forEach(ally => {
@@ -104,11 +116,13 @@ export default function UniteDraftApp() {
           }
         }
       });
+      
       if (isRoleDuplicated) {
         score -= 30;
         reasons.push('⚠️ ロール重複');
       }
 
+      // 既にピック・BANされているキャラは除外
       if (blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name)) {
         score = -999; 
       }
@@ -119,6 +133,7 @@ export default function UniteDraftApp() {
     return scored.filter(p => p.score > -900).sort((a, b) => b.score - a.score).slice(0, 5);
   }, [db, matrix, blueTeam, redTeam, bans, myPool]);
 
+  // 以降のUI操作・レンダリングロジックは変更なし
   const handlePickBlue = (name: string) => {
     if (blueTeam.length < 5) setBlueTeam([...blueTeam, name]);
   };
@@ -136,7 +151,7 @@ export default function UniteDraftApp() {
     setBlueTeam([]); setRedTeam([]); setBans([]);
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">データをキャッシュ中...</div>;
+  if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">データを読み込んでいます...</div>;
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans max-w-2xl mx-auto">
