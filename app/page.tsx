@@ -177,7 +177,7 @@ export default function UniteDraftApp() {
               <div>
                 <h3 className="font-bold text-yellow-400 mb-1">⚡ 3. レコメンドを活用しよう</h3>
                 <p className="text-xs leading-relaxed">
-                  ドラフトが進むにつれ、中央にAIのおすすめキャラが表示されます。<br/>
+                  ドラフトが進むにつれ、中央におすすめキャラが表示されます。<br/>
                   ・<span className="font-bold text-white">Tier環境（EX/S/A）</span><br/>
                   ・<span className="font-bold text-white">敵へのカウンター相性</span><br/>
                   ・<span className="font-bold text-white">味方とのロール被り回避</span><br/>
