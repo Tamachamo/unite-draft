@@ -18,10 +18,10 @@ export default function UniteDraftApp() {
   const [bans, setBans] = useState<string[]>([]);
   const [myPool, setMyPool] = useState<string[]>([]);
 
-  // アクションモード
+  // 画面下部のキャラプールをクリックした際のアクションモード
   const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
 
-  // 初回データ読み込み
+  // 初回データ読み込み（自分のAPI経由）
   useEffect(() => {
     async function loadData() {
       try {
@@ -84,15 +84,27 @@ export default function UniteDraftApp() {
         }
       });
 
-      // 4. 味方とのロール重複ペナルティ
-      const myRole = (pokemon['タグ'] || "").split(',')[0];
+      // 4. 味方とのロール重複ペナルティ（💡バグ修正版）
+      // タグの中から "Melee" と "Ranged" 以外を抽出して真のロールを特定する
+      const getRealRole = (tagStr: string) => {
+        return (tagStr || "").split(',').map(t => t.trim()).find(t => t !== 'Melee' && t !== 'Ranged') || "";
+      };
+      
+      const myRole = getRealRole(pokemon['タグ']);
       let isRoleDuplicated = false;
-      blueTeam.forEach(ally => {
-        const allyData = getPokemonData(ally);
-        if (allyData && (allyData['タグ'] || "").includes(myRole)) {
-          isRoleDuplicated = true;
-        }
-      });
+      
+      if (myRole) {
+        blueTeam.forEach(ally => {
+          const allyData = getPokemonData(ally);
+          if (allyData) {
+            const allyRole = getRealRole(allyData['タグ']);
+            if (allyRole === myRole) {
+              isRoleDuplicated = true;
+            }
+          }
+        });
+      }
+
       if (isRoleDuplicated) {
         score -= 30;
         reasons.push('⚠️ ロール重複');
