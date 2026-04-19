@@ -18,7 +18,6 @@ export default function UniteDraftApp() {
   const [myPool, setMyPool] = useState<string[]>([]);
   const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
   
-  // 💡 使い方モーダルの表示状態を管理
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   useEffect(() => {
@@ -48,76 +47,105 @@ export default function UniteDraftApp() {
 
   const getPokemonData = (name: string) => db.find(p => p['名前(JP)'] === name);
 
+  // 💡 選択モードに応じてAIの計算ロジックを切り替える
   const recommendations = useMemo(() => {
     if (!db.length) return [];
+    const isBanMode = selectionMode === 'ban';
 
     const scored = db.map((pokemon: any) => {
       const name = pokemon['名前(JP)'];
       let score = 50; 
       let reasons: string[] = [];
 
-      // 1. 環境メタ（Tier）の評価
-      const tier = pokemon['ティア'] || "";
-      if (tier.includes("EX")) { score += 40; reasons.push('👑 EXティア'); }
-      else if (tier.includes("S")) { score += 30; reasons.push('📈 Sティア'); }
-      else if (tier.includes("A")) { score += 20; reasons.push('✨ Aティア'); }
-
-      // 2. 持ちキャラボーナス
-      if (myPool.includes(name)) {
-        score += 80;
-        reasons.push('⭐ 持ちキャラ');
+      // すでにピック・BANされたキャラは両モード共通で除外
+      if (blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name)) {
+        score = -999; 
+        return { ...pokemon, score, reasons };
       }
 
-      // 3. 敵チームへのカウンター評価
-      redTeam.forEach((enemy: string) => {
-        const enemyMatrix = matrix.find((m: any) => m.name === enemy);
-        if (enemyMatrix && enemyMatrix.counters) {
-          const match = enemyMatrix.counters.find((c: any) => c.name === name);
-          if (match) {
-            if (match.rank === 'S') { score += 40; reasons.push(`🔥 ${enemy}に激刺さり`); }
-            if (match.rank === 'A') { score += 20; reasons.push(`👍 ${enemy}に有利`); }
-          }
-        }
-      });
+      if (isBanMode) {
+        // ==========================================
+        // 🚫 BANモード専用の思考ロジック
+        // ==========================================
+        const tier = pokemon['ティア'] || "";
+        if (tier.includes("EX")) { score += 50; reasons.push('🚨 危険(EX)'); }
+        else if (tier.includes("S")) { score += 30; reasons.push('⚠️ 要注意(S)'); }
 
-      // 4. 味方とのロール重複ペナルティ
-      const getRealRole = (tagStr: string) => {
-        if (!tagStr) return "";
-        const tags = tagStr.split(',').map(t => t.trim());
-        const validRoles = ['Attacker', 'Defender', 'Speedster', 'Supporter', 'All-Rounder', 'アタック', 'ディフェンス', 'スピード', 'サポート', 'バランス'];
-        return tags.find(t => validRoles.includes(t)) || "";
-      };
-      
-      const myRole = getRealRole(pokemon['タグ']);
-      let isRoleDuplicated = false;
-      
-      if (myRole !== "") {
+        // 自分の得意キャラはBANしないよう減点
+        if (myPool.includes(name)) {
+          score -= 50;
+          reasons.push('⭐ 得意(非推奨)');
+        }
+
+        // 味方の弱点を消す（味方のカウンターをBAN提案）
         blueTeam.forEach((ally: string) => {
-          const allyData = getPokemonData(ally);
-          if (allyData) {
-            const allyRole = getRealRole(allyData['タグ']);
-            if (allyRole !== "" && allyRole === myRole) {
-              isRoleDuplicated = true;
+          const allyMatrix = matrix.find((m: any) => m.name === ally);
+          if (allyMatrix && allyMatrix.counters) {
+            const match = allyMatrix.counters.find((c: any) => c.name === name);
+            if (match) {
+              if (match.rank === 'S') { score += 40; reasons.push(`🛡️ ${ally}を守る`); }
+              if (match.rank === 'A') { score += 20; reasons.push(`🛡️ ${ally}の弱点`); }
             }
           }
         });
-      }
 
-      if (isRoleDuplicated) {
-        score -= 30;
-        reasons.push('⚠️ ロール重複');
-      }
+      } else {
+        // ==========================================
+        // 🟦 味方ピックモードの思考ロジック (既存)
+        // ==========================================
+        const tier = pokemon['ティア'] || "";
+        if (tier.includes("EX")) { score += 40; reasons.push('👑 EXティア'); }
+        else if (tier.includes("S")) { score += 30; reasons.push('📈 Sティア'); }
+        else if (tier.includes("A")) { score += 20; reasons.push('✨ Aティア'); }
 
-      // 5. ピック・BAN済みの除外
-      if (blueTeam.includes(name) || redTeam.includes(name) || bans.includes(name)) {
-        score = -999; 
+        if (myPool.includes(name)) {
+          score += 80;
+          reasons.push('⭐ 持ちキャラ');
+        }
+
+        redTeam.forEach((enemy: string) => {
+          const enemyMatrix = matrix.find((m: any) => m.name === enemy);
+          if (enemyMatrix && enemyMatrix.counters) {
+            const match = enemyMatrix.counters.find((c: any) => c.name === name);
+            if (match) {
+              if (match.rank === 'S') { score += 40; reasons.push(`🔥 ${enemy}に激刺さり`); }
+              if (match.rank === 'A') { score += 20; reasons.push(`👍 ${enemy}に有利`); }
+            }
+          }
+        });
+
+        const getRealRole = (tagStr: string) => {
+          if (!tagStr) return "";
+          const tags = tagStr.split(',').map(t => t.trim());
+          const validRoles = ['Attacker', 'Defender', 'Speedster', 'Supporter', 'All-Rounder', 'アタック', 'ディフェンス', 'スピード', 'サポート', 'バランス'];
+          return tags.find(t => validRoles.includes(t)) || "";
+        };
+        
+        const myRole = getRealRole(pokemon['タグ']);
+        let isRoleDuplicated = false;
+        if (myRole !== "") {
+          blueTeam.forEach((ally: string) => {
+            const allyData = getPokemonData(ally);
+            if (allyData) {
+              const allyRole = getRealRole(allyData['タグ']);
+              if (allyRole !== "" && allyRole === myRole) {
+                isRoleDuplicated = true;
+              }
+            }
+          });
+        }
+
+        if (isRoleDuplicated) {
+          score -= 30;
+          reasons.push('⚠️ ロール重複');
+        }
       }
 
       return { ...pokemon, score, reasons };
     });
 
     return scored.filter((p: any) => p.score > -900).sort((a: any, b: any) => b.score - a.score).slice(0, 5);
-  }, [db, matrix, blueTeam, redTeam, bans, myPool]);
+  }, [db, matrix, blueTeam, redTeam, bans, myPool, selectionMode]); // 💡 selectionModeを依存配列に追加
 
   const handleCharacterClick = (name: string) => {
     if (selectionMode === 'blue' && blueTeam.length < 5) setBlueTeam([...blueTeam, name]);
@@ -150,7 +178,7 @@ export default function UniteDraftApp() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans max-w-2xl mx-auto flex flex-col relative">
       
-      {/* 💡 使い方モーダル */}
+      {/* 使い方モーダル */}
       {isHelpOpen && (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-600 shadow-2xl flex flex-col max-h-[85vh]">
@@ -203,7 +231,7 @@ export default function UniteDraftApp() {
         </div>
       )}
 
-      {/* ヘッダーエリア (💡 使い方ボタン追加) */}
+      {/* ヘッダーエリア */}
       <div className="flex justify-between items-end mb-4">
         <div>
           <h1 className="text-2xl font-black tracking-wider text-blue-400">DRAFT ANALYZER</h1>
@@ -218,6 +246,7 @@ export default function UniteDraftApp() {
         </div>
       </div>
 
+      {/* チーム表示エリア */}
       <div className="grid grid-cols-2 gap-3 mb-4 sticky top-[10px] z-20">
         <div className={`rounded-xl p-3 border-l-4 shadow-xl transition-colors min-h-[100px] bg-slate-950/80 backdrop-blur-sm ${selectionMode === 'blue' ? 'border-blue-400' : 'border-blue-800/50'}`}>
           <p className="text-xs font-bold text-blue-400 mb-2">BLUE TEAM (味方)</p>
@@ -271,18 +300,19 @@ export default function UniteDraftApp() {
         </div>
       </div>
 
+      {/* 💡 おすすめエリア (BANモード時はタイトルが変わる) */}
       <div className="mb-6 flex-shrink-0 relative z-10">
-        <h2 className="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
-          <span>⚡</span> おすすめピック
+        <h2 className={`text-sm font-bold mb-2 flex items-center gap-2 ${selectionMode === 'ban' ? 'text-red-400' : 'text-yellow-400'}`}>
+          <span>⚡</span> {selectionMode === 'ban' ? 'おすすめ BAN' : 'おすすめピック'}
         </h2>
         <div className="space-y-2">
           {recommendations.length > 0 ? recommendations.map((rec: any, i: number) => {
             const iconUrl = rec['アイコンURL'];
             return (
-              <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex gap-3 items-center ${i === 0 ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-slate-700'}`}>
+              <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex gap-3 items-center ${i === 0 ? (selectionMode === 'ban' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]') : 'border-slate-700'}`}>
                 {iconUrl ? (
                   <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-600 flex-shrink-0 bg-slate-900">
-                    <img src={iconUrl} alt={rec['名前(JP)']} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                    <img src={iconUrl} alt={rec['名前(JP)']} className={`w-full h-full object-cover ${selectionMode === 'ban' ? 'grayscale opacity-70' : ''}`} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                   </div>
                 ) : (
                   <div className="w-14 h-14 rounded-lg border border-slate-600 flex-shrink-0 bg-slate-900 flex items-center justify-center">
@@ -296,16 +326,24 @@ export default function UniteDraftApp() {
                   </div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {(rec.reasons || []).map((r: string, idx: number) => (
-                      <span key={idx} className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded text-slate-300 border border-slate-700">{r}</span>
+                      <span key={idx} className={`text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 ${selectionMode === 'ban' && r.includes('🛡️') ? 'text-blue-300' : 'text-slate-300'}`}>{r}</span>
                     ))}
                   </div>
                 </div>
+                {/* 💡 ボタンもモードに合わせて変化 */}
                 <button 
-                  onClick={() => setBlueTeam([...blueTeam, rec['名前(JP)']])} 
-                  disabled={blueTeam.length >= 5}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 px-4 py-3 rounded-lg font-bold text-xs shadow-lg transition"
+                  onClick={() => {
+                    if (selectionMode === 'ban') setBans([...bans, rec['名前(JP)']]);
+                    else setBlueTeam([...blueTeam, rec['名前(JP)']]);
+                  }} 
+                  disabled={selectionMode === 'ban' ? bans.length >= 6 : blueTeam.length >= 5}
+                  className={`px-4 py-3 rounded-lg font-bold text-xs shadow-lg transition text-white ${
+                    selectionMode === 'ban' 
+                      ? 'bg-slate-600 hover:bg-slate-500 disabled:bg-slate-800' 
+                      : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
+                  }`}
                 >
-                  PICK
+                  {selectionMode === 'ban' ? 'BAN' : 'PICK'}
                 </button>
               </div>
             )
