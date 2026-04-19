@@ -273,7 +273,7 @@ export default function UniteDraftApp() {
 
       <div className="mb-6 flex-shrink-0 relative z-10">
         <h2 className="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
-          <span>⚡</span> AI RECOMMENDED PICKS
+          <span>⚡</span> おすすめピック
         </h2>
         <div className="space-y-2">
           {recommendations.length > 0 ? recommendations.map((rec: any, i: number) => {
