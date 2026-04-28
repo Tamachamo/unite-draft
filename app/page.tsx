@@ -27,7 +27,6 @@ export default function UniteDraftApp() {
         setLoading(true);
         setErrorLog(null);
         
-        // 💡 分離型のAPIルート経由に戻しました！
         const res = await fetch('/api/gas');
         const data = await res.json();
         
@@ -365,7 +364,8 @@ export default function UniteDraftApp() {
                   </button>
                 </div>
 
-                {!isBanMode && buildsString && (
+                {/* 💡 selectionMode !== 'ban' に直接書き換えました */}
+                {selectionMode !== 'ban' && buildsString && (
                   <div className="mt-1 pt-2 border-t border-slate-700/50">
                     {buildsString.split('\n').filter(Boolean).slice(0, 1).map((buildStr: string, bIdx: number) => {
                       const match = buildStr.match(/\[(.*?)\] 持ち物: (.*?) \/ 技: (.*)/);
