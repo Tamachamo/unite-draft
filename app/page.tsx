@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
 
 // ==========================================
 // メインコンポーネント
@@ -19,8 +18,6 @@ export default function UniteDraftApp() {
   const [selectionMode, setSelectionMode] = useState<'blue' | 'red' | 'ban'>('blue');
   
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-
-  // 💡 検索＆絞り込み用のステートを追加
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
 
@@ -30,6 +27,7 @@ export default function UniteDraftApp() {
         setLoading(true);
         setErrorLog(null);
         
+        // 💡 分離型のAPIルート経由に戻しました！
         const res = await fetch('/api/gas');
         const data = await res.json();
         
@@ -141,19 +139,16 @@ export default function UniteDraftApp() {
     return scored.filter((p: any) => p.score > -900).sort((a: any, b: any) => b.score - a.score).slice(0, 5);
   }, [db, matrix, blueTeam, redTeam, bans, myPool, selectionMode]);
 
-  // 💡 キャラクタープールの絞り込み処理
   const filteredDb = useMemo(() => {
     return db.filter((p: any) => {
       const name = p['名前(JP)'] || '';
       const tags = p['タグ'] || '';
 
-      // ① 検索ワードの処理（ひらがな・カタカナの表記ゆれを吸収）
       const normalize = (str: string) => str.replace(/[\u3041-\u3096]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60));
       if (searchTerm && !normalize(name).includes(normalize(searchTerm))) {
         return false;
       }
 
-      // ② ロール（型）の処理
       if (roleFilter !== 'All') {
         const roleMap: Record<string, string[]> = {
           'アタック': ['Attacker', 'アタック'],
@@ -328,42 +323,72 @@ export default function UniteDraftApp() {
         <div className="space-y-2">
           {recommendations.length > 0 ? recommendations.map((rec: any, i: number) => {
             const iconUrl = rec['アイコンURL'];
+            const buildsString = rec['おすすめビルド(EN)'] || '';
+            
             return (
-              <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex gap-3 items-center ${i === 0 ? (selectionMode === 'ban' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]') : 'border-slate-700'}`}>
-                {iconUrl ? (
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-600 flex-shrink-0 bg-slate-900">
-                    <img src={iconUrl} alt={rec['名前(JP)']} className={`w-full h-full object-cover ${selectionMode === 'ban' ? 'grayscale opacity-70' : ''}`} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              <div key={rec['名前(JP)']} className={`bg-slate-800 p-3 rounded-lg border flex flex-col gap-2 ${i === 0 ? (selectionMode === 'ban' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]') : 'border-slate-700'}`}>
+                
+                <div className="flex gap-3 items-center w-full">
+                  {iconUrl ? (
+                    <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-600 flex-shrink-0 bg-slate-900">
+                      <img src={iconUrl} alt={rec['名前(JP)']} className={`w-full h-full object-cover ${selectionMode === 'ban' ? 'grayscale opacity-70' : ''}`} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg border border-slate-600 flex-shrink-0 bg-slate-900 flex items-center justify-center">
+                      <span className="text-[10px] text-slate-500">No Img</span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-lg truncate">{rec['名前(JP)']}</span>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap">{rec['攻撃タイプ']}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(rec.reasons || []).map((r: string, idx: number) => (
+                        <span key={idx} className={`text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 ${selectionMode === 'ban' && r.includes('🛡️') ? 'text-blue-300' : 'text-slate-300'}`}>{r}</span>
+                      ))}
+                    </div>
                   </div>
-                ) : (
-                  <div className="w-14 h-14 rounded-lg border border-slate-600 flex-shrink-0 bg-slate-900 flex items-center justify-center">
-                    <span className="text-[10px] text-slate-500">No Img</span>
+                  <button 
+                    onClick={() => {
+                      if (selectionMode === 'ban') setBans([...bans, rec['名前(JP)']]);
+                      else setBlueTeam([...blueTeam, rec['名前(JP)']]);
+                    }} 
+                    disabled={selectionMode === 'ban' ? bans.length >= 6 : blueTeam.length >= 5}
+                    className={`px-4 py-3 rounded-lg font-bold text-xs shadow-lg transition text-white flex-shrink-0 ${
+                      selectionMode === 'ban' 
+                        ? 'bg-slate-600 hover:bg-slate-500 disabled:bg-slate-800' 
+                        : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
+                    }`}
+                  >
+                    {selectionMode === 'ban' ? 'BAN' : 'PICK'}
+                  </button>
+                </div>
+
+                {!isBanMode && buildsString && (
+                  <div className="mt-1 pt-2 border-t border-slate-700/50">
+                    {buildsString.split('\n').filter(Boolean).slice(0, 1).map((buildStr: string, bIdx: number) => {
+                      const match = buildStr.match(/\[(.*?)\] 持ち物: (.*?) \/ 技: (.*)/);
+                      if (match) {
+                        const [_, buildName, items, moves] = match;
+                        return (
+                          <div key={bIdx} className="text-[10px] text-slate-400 space-y-1">
+                            <div className="flex items-start gap-1">
+                              <span className="bg-emerald-900/50 text-emerald-400 px-1 rounded text-[9px] font-bold border border-emerald-800 flex-shrink-0 mt-[1px]">持物</span>
+                              <span className="leading-tight text-slate-300">{items.split(',').map((i: string) => i.trim()).join(' / ')}</span>
+                            </div>
+                            <div className="flex items-start gap-1 mt-1">
+                              <span className="bg-orange-900/50 text-orange-400 px-1 rounded text-[9px] font-bold border border-orange-800 flex-shrink-0 mt-[1px]">技</span>
+                              <span className="leading-tight text-slate-300">{moves}</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return <div key={bIdx} className="text-[9px] text-slate-500 truncate">{buildStr}</div>;
+                    })}
                   </div>
                 )}
-                <div className="flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-lg">{rec['名前(JP)']}</span>
-                    <span className="text-[10px] text-slate-400">{rec['攻撃タイプ']}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {(rec.reasons || []).map((r: string, idx: number) => (
-                      <span key={idx} className={`text-[10px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 ${selectionMode === 'ban' && r.includes('🛡️') ? 'text-blue-300' : 'text-slate-300'}`}>{r}</span>
-                    ))}
-                  </div>
-                </div>
-                <button 
-                  onClick={() => {
-                    if (selectionMode === 'ban') setBans([...bans, rec['名前(JP)']]);
-                    else setBlueTeam([...blueTeam, rec['名前(JP)']]);
-                  }} 
-                  disabled={selectionMode === 'ban' ? bans.length >= 6 : blueTeam.length >= 5}
-                  className={`px-4 py-3 rounded-lg font-bold text-xs shadow-lg transition text-white ${
-                    selectionMode === 'ban' 
-                      ? 'bg-slate-600 hover:bg-slate-500 disabled:bg-slate-800' 
-                      : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
-                  }`}
-                >
-                  {selectionMode === 'ban' ? 'BAN' : 'PICK'}
-                </button>
+
               </div>
             )
           }) : (
@@ -378,7 +403,6 @@ export default function UniteDraftApp() {
         <button onClick={() => setSelectionMode('red')} className={`flex-1 py-2.5 text-xs font-bold rounded transition ${selectionMode === 'red' ? 'bg-red-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400'}`}>🟥 敵</button>
       </div>
 
-      {/* 💡 検索＆絞り込みバーエリア */}
       <div className="bg-slate-800 px-3 py-2 border-b border-slate-700 shadow-inner">
         <input 
           type="text" 
@@ -407,7 +431,6 @@ export default function UniteDraftApp() {
       <div className="bg-slate-800 rounded-b-2xl p-3 flex-1 overflow-y-auto min-h-[400px]">
         <h3 className="text-[10px] font-bold text-slate-500 mb-3 text-center">タップで追加 / 「★」で得意キャラ登録</h3>
         
-        {/* 💡 filteredDbを使用して表示 */}
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {filteredDb.map((p: any) => {
             const name = p['名前(JP)'];
