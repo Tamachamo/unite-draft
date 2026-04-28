@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   // 最新のGASのURL
-  const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbz9Pb2ps7akTFD0hR1m1ZwYEFpLBaiEgL1TseYnNTkCNroxtoofkF_OsIMV45fcKzbS/exec';
+  const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwLBfHBOM17IcpuDlgwjr28oA7ZYctnZadnmZLguvHpwutI7W2eT2bit0NCvRe2iF0s/exec';
 
   try {
     const res = await fetch(GAS_API_URL, { 
